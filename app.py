@@ -2,6 +2,8 @@
 import math
 import pandas as pd
 import streamlit as st
+from docx import Document
+from io import BytesIO
 
 # stil "wide" fără set_page_config
 st.markdown("""
@@ -160,4 +162,51 @@ with c5: st.metric("ΔH_D – Refulare [m]", f"{h_D:.3f}")
 st.markdown("---")
 st.write(f"**Sugestie debit** (D_S={D_S*1000:.0f} mm; v_S recomandat {vmin}…{vmax} m/s): "
          f"Q_min ≈ **{Qmin:.1f} m³/h**, Q_max ≈ **{Qmax:.1f} m³/h**.")
+
+def generate_report(NPSH_a, p1_bar, p2_bar, h_S, h_D, inputs_tbl):
+    doc = Document()
+
+    # Copertă simplă
+    doc.add_heading("Raport calcul pompă", 0)
+    doc.add_paragraph("Spațiu liber pentru completare manuală:\n\n"
+                      "TAG pompă: __________________________\n"
+                      "Proiect: ____________________________\n"
+                      "Data: ______________________________\n")
+    doc.add_page_break()
+
+    # Rezultate principale
+    doc.add_heading("Rezultate principale", level=1)
+    doc.add_paragraph(f"NPSH (A): {NPSH_a:.3f} m")
+    doc.add_paragraph(f"Presiune în stutul de aspirație (p₁): {p1_bar:.3f} bar(abs)")
+    doc.add_paragraph(f"Presiune în stutul de refulare (p₂): {p2_bar:.3f} bar(abs)")
+    doc.add_paragraph(f"Pierderea pe conductă de aspirație (ΔH_S): {h_S:.3f} m")
+    doc.add_paragraph(f"Pierderea pe conductă de refulare (ΔH_D): {h_D:.3f} m")
+
+    # Date de intrare
+    doc.add_heading("Date de intrare", level=1)
+    table = doc.add_table(rows=1, cols=3)
+    hdr_cells = table.rows[0].cells
+    hdr_cells[0].text = "Mărime"
+    hdr_cells[1].text = "Valoare"
+    hdr_cells[2].text = "Unități"
+
+    for _, row in inputs_tbl.iterrows():
+        row_cells = table.add_row().cells
+        row_cells[0].text = str(row["Mărime"])
+        row_cells[1].text = str(round(row["Valoare"], 3))
+        row_cells[2].text = str(row["Unități"])
+
+    # Salvare în buffer
+    buffer = BytesIO()
+    doc.save(buffer)
+    buffer.seek(0)
+    return buffer
+
+report_file = generate_report(NPSH_a, pa_to_bar(p1), pa_to_bar(p2), h_S, h_D, tbl)
+st.download_button(
+    label="📄 Descarcă raport Word",
+    data=report_file,
+    file_name="raport_pompa.docx",
+    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+)
 
