@@ -6,8 +6,9 @@ import streamlit as st
 # stil "wide" fără set_page_config
 st.markdown("""
 <style>
-.block-container {max-width: 1200px; padding-top: .5rem; padding-bottom: 1.5rem;}
-.big {font-size: 1.6rem; font-weight: 700; margin-top: .5rem;}
+h1 a, h2 a, h3 a, h4 a, h5 a, h6 a {
+    display: none;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -159,3 +160,4 @@ with c5: st.metric("ΔH_D – Refulare [m]", f"{h_D:.3f}")
 st.markdown("---")
 st.write(f"**Sugestie debit** (D_S={D_S*1000:.0f} mm; v_S recomandat {vmin}…{vmax} m/s): "
          f"Q_min ≈ **{Qmin:.1f} m³/h**, Q_max ≈ **{Qmax:.1f} m³/h**.")
+
