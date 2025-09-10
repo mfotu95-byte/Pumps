@@ -1,22 +1,23 @@
-# Pump Line Calculator – SI
-# NPSH_available, Δp pe aspirație (S) și refulare (D), p1/p2 la duzele pompei.
-# Selectezi fittingurile dintr-o bibliotecă simplă (K sau Δp fix [bar]).
+# Pump Line Calculator – SI (refined UI)
+# Rezultate mari: NPSH(A), p_refulare (p2), p_aspiratie (p1)
+# Fittings selectabile; pres. rezervor atmosferica/custom; pompa sub/deasupra nivelului.
 
 import math
 import pandas as pd
 import streamlit as st
 
-# ---- stil "wide" fără set_page_config (evită StreamlitAPIException) ----
+# ---- stil "wide" fără set_page_config ----
 st.markdown("""
 <style>
-.block-container {max-width: 1200px; padding-top: 1rem; padding-bottom: 2rem;}
+.block-container {max-width: 1200px; padding-top: 0.5rem; padding-bottom: 1.5rem;}
+.big {font-size: 1.6rem; font-weight: 700; margin-top: 0.5rem;}
+.subtle {color: #666; font-size: 0.9rem;}
 </style>
 """, unsafe_allow_html=True)
 
 g = 9.80665  # m/s²
 
-# ---------- Bibliotecă fittinguri (editabilă) ----------
-# col: grup, denumire, tip("K" sau "dp"), valoare, notă
+# ---------- Bibliotecă fittinguri ----------
 LIB = pd.DataFrame([
     ["Elbow",   "Elbow 90° (LR)",   "K", 0.30, "0.2–0.4"],
     ["Elbow",   "Elbow 45°",        "K", 0.20, "0.15–0.3"],
@@ -50,7 +51,7 @@ def h_major(f, L, D, v):
 def h_minor(Ksum, v):     
     return Ksum * (v*v) / (2*g)
 
-def dp_pa(rho, h):        # transformă head [m] în presiune [Pa]
+def dp_pa(rho, h):        # head [m] -> Pa
     return rho * g * h
 
 def pa_to_bar(pa):        # Pa -> bar
@@ -58,6 +59,11 @@ def pa_to_bar(pa):        # Pa -> bar
 
 def bar_to_pa(bar):       # bar -> Pa
     return bar * 1e5
+
+def p_atm_from_alt_bar(h_m: float) -> float:
+    """Presiune atmosferică standard în bar(abs) la altitudine h [m]. ISA simplificată."""
+    pa = 101325.0 * (1.0 - 2.25577e-5 * h_m) ** 5.25588
+    return pa / 1e5
 
 def ui_line(title, Dmm_def, L_def, epsmm_def, multiselect_key):
     """UI pentru o linie (S sau D). Returnează D[m], L[m], eps[m], Ksum[-], dpsum_bar[bar], df_items."""
@@ -90,26 +96,58 @@ def ui_line(title, Dmm_def, L_def, epsmm_def, multiselect_key):
     Ksum = st.number_input("K (extra) [-]", 0.0, 500.0, Ksum, 0.1, key=title+"Kextra")
     return D, L, eps, Ksum, dpsum_bar, df
 
-# ---------- Inputuri generale ----------
-st.title("Pump Line Calculator – SI (simplu)")
+# ============================================================
+#                   UI: Panou stânga (intrări)
+# ============================================================
+st.sidebar.title("Intrări (SI)")
 
-s1,s2,s3,s4 = st.columns(4)
-with s1: rho = st.number_input("ρ [kg/m³]", 100.0, 3000.0, 1000.0, 1.0)
-with s2: mu  = st.number_input("μ [mPa·s]", 0.1, 5000.0, 1.0, 0.1) / 1000.0  # Pa·s
-with s3: Q   = st.number_input("Q [m³/h]", 0.01, 200000.0, 50.0, 0.1) / 3600.0  # m³/s
-with s4: Pv  = bar_to_pa(st.number_input("P_vap [bar(abs)]", 0.0, 15.0, 0.023, 0.001))
+# Fluide
+rho = st.sidebar.number_input("ρ [kg/m³]", 100.0, 3000.0, 1000.0, 1.0)
+mu  = st.sidebar.number_input("μ [mPa·s]", 0.1, 5000.0, 1.0, 0.1) / 1000.0  # Pa·s
+Q   = st.sidebar.number_input("Q [m³/h]", 0.01, 200000.0, 50.0, 0.1) / 3600.0  # m³/s
+Pv  = bar_to_pa(st.sidebar.number_input("P_vap [bar(abs)]", 0.0, 15.0, 0.023, 0.001))
 
-b1,b2,b3,b4 = st.columns(4)
-with b1: Ps = bar_to_pa(st.number_input("P_s (rezervor) [bar(abs)]", 0.0, 50.0, 1.013, 0.01))
-with b2: Pd = bar_to_pa(st.number_input("P_d (destinație) [bar(abs)]", 0.0, 100.0, 1.013, 0.01))
-with b3: Dz_S = st.number_input("Δz_S [m]", -100.0, 200.0, 2.0, 0.1, help="(+): suprafața peste pompă")
-with b4: Dz_D = st.number_input("Δz_D [m]", -200.0, 500.0, 10.0, 0.1, help="(+): destinația peste pompă")
+# Pompa sub/deasupra suprafeței
+pos_choice = st.sidebar.radio("Poziția pompei vs. suprafața de aspirație",
+                              ["Sub nivel (inundată)", "Deasupra nivelului"],
+                              index=0)
+dz_mag = st.sidebar.number_input("Distanța verticală |Δz| [m]",
+                                 0.0, 200.0, 2.0, 0.1,
+                                 help="Distanța pe verticală între suprafața lichid și axa pompei.")
+Dz_S = dz_mag if pos_choice == "Sub nivel (inundată)" else -dz_mag
 
-# ---------- Linii S și D ----------
+# Presiunea în rezervorul de aspirație
+p_res_choice = st.sidebar.radio("Presiunea în rezervorul de aspirație",
+                                ["Atmosferică", "Custom"],
+                                index=0)
+if p_res_choice == "Atmosferică":
+    alt = st.sidebar.number_input("Altitudine amplasament [m]", -400.0, 4000.0, 0.0, 10.0)
+    Ps_bar = p_atm_from_alt_bar(alt)
+    st.sidebar.write(f"**P_atm ≈ {Ps_bar:.3f} bar(abs)**")
+else:
+    Ps_bar = st.sidebar.number_input("P_s [bar(abs)]", 0.0, 50.0, 1.013, 0.01)
+
+Ps = bar_to_pa(Ps_bar)
+
+# Presiunea la destinație (refulare)
+Pd_bar = st.sidebar.number_input("P_d (destinație) [bar(abs)]", 0.0, 100.0, 1.013, 0.01)
+Pd = bar_to_pa(Pd_bar)
+
+# Cota destinației
+Dz_D = st.sidebar.number_input("Δz_D [m]", -200.0, 500.0, 10.0, 0.1,
+                               help="(+): destinația mai sus decât pompa.")
+
+st.title("Pump Line Calculator – SI (refined)")
+
+# ============================================================
+#               Linii S și D (conductă + fittinguri)
+# ============================================================
 D_S, L_S, eps_S, K_S, dpsumS_bar, dfS = ui_line("S (Suction)", 100.0, 20.0, 0.045, "selS")
 D_D, L_D, eps_D, K_D, dpsumD_bar, dfD = ui_line("D (Discharge)", 80.0, 80.0, 0.045, "selD")
 
-# ---------- Calcule ----------
+# ============================================================
+#                       Calcule
+# ============================================================
 # viteze
 A_S = math.pi * D_S**2 / 4.0
 A_D = math.pi * D_D**2 / 4.0
@@ -133,39 +171,36 @@ p2 = Pd + dp_pa(rho, Dz_D + h_D)      # refulare (la pompă)
 # NPSH_available (cap total la secțiunea S minus Pvap)
 NPSH_a = p1 / (rho * g) + v_S**2 / (2 * g) - Pv / (rho * g)
 
-# ---------- Rezultate ----------
+# Recomandări Q_min / Q_max în funcție de v pe aspirație
+v_min_S = 0.5   # m/s
+v_max_S = 1.5   # m/s
+Qmin = v_min_S * A_S * 3600.0  # m³/h
+Qmax = v_max_S * A_S * 3600.0  # m³/h
+
+# ============================================================
+#                       Rezultate mari
+# ============================================================
 st.markdown("---")
-c1,c2,c3 = st.columns(3)
-with c1:
-    st.metric("v_S [m/s]", f"{v_S:.3f}")
-    st.metric("Re_S [-]", f"{Re_S:,.0f}")
-    st.metric("f_S [-]", f"{f_S:.4f}")
-    st.metric("h_S [m]", f"{h_S:.3f}")
-with c2:
-    st.metric("v_D [m/s]", f"{v_D:.3f}")
-    st.metric("Re_D [-]", f"{Re_D:,.0f}")
-    st.metric("f_D [-]", f"{f_D:.4f}")
-    st.metric("h_D [m]", f"{h_D:.3f}")
-with c3:
-    st.metric("p₁ (S nozzle) [bar(abs)]", f"{pa_to_bar(p1):.3f}")
-    st.metric("p₂ (D nozzle) [bar(abs)]", f"{pa_to_bar(p2):.3f}")
-    st.metric("NPSH_a [m]", f"{NPSH_a:.3f}")
+st.markdown("<div class='big'>Rezultate</div>", unsafe_allow_html=True)
 
-# tabel sumar
-tbl = pd.DataFrame({
-    "Mărime": ["ρ","μ","Q","D_S","L_S","ε_S","K_S","Δp_S[bar]","D_D","L_D","ε_D","K_D","Δp_D[bar]","p₁","p₂","NPSH_a"],
-    "Valoare":[rho, mu*1000, Q*3600, D_S*1000, L_S, eps_S*1000, K_S, dpsumS_bar,
-               D_D*1000, L_D, eps_D*1000, K_D, dpsumD_bar, pa_to_bar(p1), pa_to_bar(p2), NPSH_a],
-    "Unități":["kg/m³","mPa·s","m³/h","mm","m","mm","-","bar","mm","m","mm","-","bar","bar(abs)","bar(abs)","m"]
-})
-st.dataframe(tbl, use_container_width=True)
+r1, r2, r3 = st.columns(3)
+with r1:
+    st.metric("NPSH (A) [m]", f"{NPSH_a:.3f}")
+with r2:
+    st.metric("Presiune refulare p₂ [bar(abs)]", f"{pa_to_bar(p2):.3f}")
+with r3:
+    st.metric("Presiune stut aspirație p₁ [bar(abs)]", f"{pa_to_bar(p1):.3f}")
 
-# tips rapide
-tips = []
-if v_S > 1.5: tips.append("v_S > 1.5 m/s – reduce viteza pe aspirație.")
-if K_S > 5:   tips.append("K_S mare – folosește coturi LR / armături cu K mic.")
-if NPSH_a < 2: tips.append("NPSH_a < 2 m – risc de cavitație.")
-if tips:
-    st.subheader("Tips")
-    for t in tips:
-        st.write("• " + t)
+st.markdown("---")
+st.write(f"**Sugestie debit** (pe baza D_S={D_S*1000:.0f} mm și v_S recomandat {v_min_S}…{v_max_S} m/s): "
+         f"Q_min ≈ **{Qmin:.1f} m³/h**, Q_max ≈ **{Qmax:.1f} m³/h**.")
+
+# opțional: info utile
+with st.expander("Detalii tehnice (opțional)"):
+    st.write(pd.DataFrame({
+        "Mărime":["v_S","Re_S","f_S","h_S","v_D","Re_D","f_D","h_D"],
+        "Valoare":[v_S, Re_S, f_S, h_S, v_D, Re_D, f_D, h_D],
+        "Unități":["m/s","-","-","m","m/s","-","-","m"]
+    }))
+    st.caption("Formule: Darcy–Weisbach; f = Swamee–Jain; ΣK pentru pierderi locale. "
+               "NPSH(A) = p₁/(ρg) + v₁²/(2g) − Pvap/(ρg).")
