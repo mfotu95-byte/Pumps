@@ -99,7 +99,7 @@ def ui_line(title, Dmm_def, L_def, epsmm_def, multiselect_key):
 # ============================================================
 #                   UI: Panou stânga (intrări)
 # ============================================================
-st.sidebar.title("Intrări (SI)")
+st.sidebar.title("Inputs")
 
 # Fluide
 rho = st.sidebar.number_input("ρ [kg/m³]", 100.0, 3000.0, 1000.0, 1.0)
@@ -137,7 +137,7 @@ Pd = bar_to_pa(Pd_bar)
 Dz_D = st.sidebar.number_input("Δz_D [m]", -200.0, 500.0, 10.0, 0.1,
                                help="(+): destinația mai sus decât pompa.")
 
-st.title("Pump Line Calculator – SI (refined)")
+st.title("Pump Line Calculator")
 
 # ============================================================
 #               Linii S și D (conductă + fittinguri)
@@ -204,3 +204,4 @@ with st.expander("Detalii tehnice (opțional)"):
     }))
     st.caption("Formule: Darcy–Weisbach; f = Swamee–Jain; ΣK pentru pierderi locale. "
                "NPSH(A) = p₁/(ρg) + v₁²/(2g) − Pvap/(ρg).")
+
