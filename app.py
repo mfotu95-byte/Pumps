@@ -12,10 +12,9 @@ from docx import Document
 # ---------- Stil "wide" + fara ancore ----------
 st.markdown("""
 <style>
-.block-container {max-width: 1200px; padding-top: .5rem; padding-bottom: 1.5rem;}
-h1 a, h2 a, h3 a, h4 a, h5 a, h6 a { display:none; }  /* ascunde ancorele */
-.big {font-size: 1.6rem; font-weight: 700; margin-top: .5rem;}
-.subtle {color:#666; font-size:.9rem;}
+h1 a, h2 a, h3 a, h4 a, h5 a, h6 a {
+    display: none;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -236,3 +235,4 @@ st.download_button(
     file_name="raport_pompa.docx",
     mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 )
+
