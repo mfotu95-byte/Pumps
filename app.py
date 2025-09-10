@@ -9,9 +9,8 @@ import streamlit as st
 # ---- stil "wide" fără set_page_config ----
 st.markdown("""
 <style>
-.block-container {max-width: 1200px; padding-top: 0.5rem; padding-bottom: 1.5rem;}
-.big {font-size: 1.6rem; font-weight: 700; margin-top: 0.5rem;}
-.subtle {color: #666; font-size: 0.9rem;}
+h1, h2, h3, h4, h5, h6 {text-decoration: none;}
+.css-15eqn8j a {display: none;}  /* ascunde link-urile de ancoră */
 </style>
 """, unsafe_allow_html=True)
 
@@ -204,4 +203,5 @@ with st.expander("Detalii tehnice (opțional)"):
     }))
     st.caption("Formule: Darcy–Weisbach; f = Swamee–Jain; ΣK pentru pierderi locale. "
                "NPSH(A) = p₁/(ρg) + v₁²/(2g) − Pvap/(ρg).")
+
 
