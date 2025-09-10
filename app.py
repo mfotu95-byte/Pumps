@@ -1,6 +1,14 @@
+import streamlit as st
+
+# TREBUIE să fie prima instrucțiune Streamlit:
+if "page_cfg" not in st.session_state:           # gardă ca să evităm reapelarea la rerun
+    st.set_page_config(page_title="Pump Line Calc – SI",
+                       layout="wide",
+                       initial_sidebar_state="expanded")
+    st.session_state.page_cfg = True
+
 import math
 import pandas as pd
-import streamlit as st
 
 st.set_page_config(page_title="Pump Line Calc – SI", layout="wide")
 g = 9.80665  # m/s²
@@ -278,4 +286,5 @@ if NPSHa<2:tips.append("NPSH_a < 2 m: risc cavitație.")
 if tips:
     st.subheader("Tips")
     for t in tips: st.write("• "+t)
+
 
